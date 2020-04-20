@@ -19,7 +19,8 @@ test_loader = Data.DataLoader(dataset=test_data, batch_size=128, shuffle=False)
 train_batch_num = len(train_loader)
 test_batch_num = len(test_loader)
 
-net = Network()
+net = Network(adjustable_mode=True, adj_kernel_size=4,
+                                    adj_stride=4, adj_avgpool=True)
 if torch.cuda.is_available():
     net = nn.DataParallel(net)
     net.cuda()

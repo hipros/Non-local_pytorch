@@ -1,12 +1,12 @@
 from torch import nn
 # from lib.non_local_concatenation import NONLocalBlock2D
 # from lib.non_local_gaussian import NONLocalBlock2D
-from lib.non_local_embedded_gaussian import NONLocalBlock2D
-# from lib.non_local_dot_product import NONLocalBlock2D
+# from lib.non_local_embedded_gaussian import NONLocalBlock2D
+from lib.non_local_dot_product import NONLocalBlock2D
 
 
 class Network(nn.Module):
-    def __init__(self):
+    def __init__(self, adjustable_mode=False, adj_kernel_size=None, adj_stride=None, adj_avgpool=True):
         super(Network, self).__init__()
 
         self.conv_1 = nn.Sequential(
@@ -16,7 +16,9 @@ class Network(nn.Module):
             nn.MaxPool2d(2),
         )
 
-        self.nl_1 = NONLocalBlock2D(in_channels=32)
+        self.nl_1 = NONLocalBlock2D(in_channels=32, sub_sample=False,
+                                    adjustable_mode=adjustable_mode, adj_kernel_size=adj_kernel_size,
+                                    adj_stride=adj_stride, adj_avgpool=adj_avgpool)
         self.conv_2 = nn.Sequential(
             nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(64),
@@ -24,7 +26,9 @@ class Network(nn.Module):
             nn.MaxPool2d(2),
         )
 
-        self.nl_2 = NONLocalBlock2D(in_channels=64)
+        self.nl_2 = NONLocalBlock2D(in_channels=64, sub_sample=False,
+                                    adjustable_mode=adjustable_mode, adj_kernel_size=adj_kernel_size,
+                                    adj_stride=adj_stride, adj_avgpool=adj_avgpool)
         self.conv_3 = nn.Sequential(
             nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(128),
@@ -73,7 +77,8 @@ if __name__ == '__main__':
     import torch
 
     img = torch.randn(3, 1, 28, 28)
-    net = Network()
+    net = Network(adjustable_mode=True, adj_kernel_size=4,
+                                    adj_stride=4, adj_avgpool=True)
     out = net(img)
     print(out.size())
 

@@ -4,13 +4,15 @@ from torch.nn import functional as F
 
 
 class _NonLocalBlockND(nn.Module):
-    def __init__(self, in_channels, inter_channels=None, dimension=3, sub_sample=True, bn_layer=True):
+    def __init__(self, in_channels, inter_channels=None, dimension=3, sub_sample=True, bn_layer=True,
+                 adjustable_mode=False, adj_kernel_size=None, adj_stride=None, adj_avgpool=True):
         super(_NonLocalBlockND, self).__init__()
 
         assert dimension in [1, 2, 3]
 
         self.dimension = dimension
         self.sub_sample = sub_sample
+        self.adjust_mode = adjustable_mode
 
         self.in_channels = in_channels
         self.inter_channels = inter_channels
@@ -56,6 +58,12 @@ class _NonLocalBlockND(nn.Module):
         self.phi = conv_nd(in_channels=self.in_channels, out_channels=self.inter_channels,
                            kernel_size=1, stride=1, padding=0)
 
+        if adjustable_mode:
+            if adj_avgpool:
+                self.adjust = nn.AvgPool2d(adj_kernel_size, stride=adj_stride)
+            else:
+                self.adjust = nn.MaxPool2d(adj_kernel_size, stride=adj_stride)
+
         if sub_sample:
             self.g = nn.Sequential(self.g, max_pool_layer)
             self.phi = nn.Sequential(self.phi, max_pool_layer)
@@ -68,15 +76,22 @@ class _NonLocalBlockND(nn.Module):
         """
 
         batch_size = x.size(0)
-
-        g_x = self.g(x).view(batch_size, self.inter_channels, -1)
+        g_x = self.g(x)
+        if self.adjust_mode:
+            g_x = self.adjust(g_x)
+        g_x = g_x.view(batch_size, self.inter_channels, -1)
         g_x = g_x.permute(0, 2, 1)
 
-        theta_x = self.theta(x).view(batch_size, self.inter_channels, -1)
+        theta_x = self.theta(x)
+        if self.adjust_mode:
+            theta_x = self.adjust(theta_x)
+        theta_x = theta_x.view(batch_size, self.inter_channels, -1)
         theta_x = theta_x.permute(0, 2, 1)
         phi_x = self.phi(x).view(batch_size, self.inter_channels, -1)
         f = torch.matmul(theta_x, phi_x)
         N = f.size(-1)
+        if self.adjust_mode:
+            f = f.permute(0, 2, 1)
         f_div_C = f / N
 
         y = torch.matmul(f_div_C, g_x)
@@ -99,11 +114,14 @@ class NONLocalBlock1D(_NonLocalBlockND):
 
 
 class NONLocalBlock2D(_NonLocalBlockND):
-    def __init__(self, in_channels, inter_channels=None, sub_sample=True, bn_layer=True):
+    def __init__(self, in_channels, inter_channels=None, sub_sample=True, bn_layer=True,
+                 adjustable_mode=False, adj_kernel_size=None, adj_stride=None, adj_avgpool=True):
         super(NONLocalBlock2D, self).__init__(in_channels,
                                               inter_channels=inter_channels,
                                               dimension=2, sub_sample=sub_sample,
-                                              bn_layer=bn_layer)
+                                              bn_layer=bn_layer,
+                                              adjustable_mode=adjustable_mode, adj_kernel_size=adj_kernel_size,
+                                              adj_stride=adj_stride, adj_avgpool=adj_avgpool)
 
 
 class NONLocalBlock3D(_NonLocalBlockND):
